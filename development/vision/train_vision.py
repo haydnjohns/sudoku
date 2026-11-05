@@ -1,6 +1,6 @@
 """Generate synthetic Sudoku digit data, train the digit CNN, and export TFLite.
 
-Run with no arguments:  python development/train_vision.py
+Run with no arguments:  python development/vision/train_vision.py
 
 Pipeline per synthetic sample:
   1. Render a raw grayscale cell crop (125x125 = 100px cell + 12px margin,
@@ -12,8 +12,9 @@ Pipeline per synthetic sample:
 Validation uses fonts that never appear in training.
 
 Then trains the CNN, reports accuracy on held-out fonts and (if present) on real
-cells in real_cells/<digit>/*.png, and writes assets/vis_model.keras
-and assets/vis_model.tflite (previous copies are kept as *_prev).
+cells in assets/vision/real_cells/<digit>/*.png, and writes
+assets/vision/models/vis_model_new.keras and
+assets/vision/models/vis_model_new.tflite.
 Predicted digit = argmax + 1, so inference in vis_cells.py is unchanged.
 """
 
@@ -22,6 +23,7 @@ import importlib.util
 import os
 import shutil
 import sys
+import time
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -38,20 +40,21 @@ CHUNK = 500                  # samples per worker task
 FONT_EXTS = {".ttf", ".otf", ".ttc"}
 
 # --- Settings (edit here; the script takes no launch arguments) ---
-ROOT = Path(__file__).resolve().parents[1]          # .../sudoku
-FONT_DIR = ROOT / "assets" / "fonts"
+ROOT = Path(__file__).resolve().parents[2]          # .../sudoku
+VISION_ASSETS = ROOT / "assets" / "vision"
+FONT_DIR = VISION_ASSETS / "fonts"
 OCR_PATH = ROOT / "src" / "vision" / "vis_cells.py"  # defines preprocess_digit
-REAL_DIR = ROOT / "real_cells"                       # <digit>/*.png real test cells
-DATA_FILE = ROOT / "development" / "sudoku_digits.npz"
-KERAS_OUT = ROOT / "assets" / "vis_model.keras"
-TFLITE_OUT = ROOT / "assets" / "vis_model.tflite"
+REAL_DIR = VISION_ASSETS / "real_cells"               # <digit>/*.png real test cells
+DATA_FILE = ROOT / "development" / "vision" / "sudoku_digits.npz"
+KERAS_OUT = VISION_ASSETS / "models" / "vis_model_new.keras"
+TFLITE_OUT = VISION_ASSETS / "models" / "vis_model_new.tflite"
 REGENERATE_DATA = True      # False = reuse DATA_FILE if it exists
-TRAIN_PER_CLASS = 5000 #20000
+TRAIN_PER_CLASS = 20000
 VAL_PER_CLASS = 2000
 VAL_FONT_FRAC = 0.15
-EPOCHS = 15 #40
+EPOCHS = 40
 BATCH_SIZE = 256            # larger batches suit the M1 GPU; small CNN, so no accuracy cost here
-USE_GPU = True              # Metal GPU if tensorflow-metal is installed; set False to compare against CPU
+USE_GPU = True             # Metal GPU if tensorflow-metal is installed; set False to compare against CPU
 SEED = 0
 WORKERS = max(1, (os.cpu_count() or 2) - 1)   # leave one core for the OS
 
@@ -517,6 +520,28 @@ def train():
         tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=6, restore_best_weights=True),
         tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3),
     ]
+    class EpochTimer(tf.keras.callbacks.Callback):
+        def on_train_begin(self, logs=None):
+            self.train_started = time.perf_counter()
+            self.epoch_times = []
+
+        def on_epoch_begin(self, epoch, logs=None):
+            self.epoch_started = time.perf_counter()
+
+        def on_epoch_end(self, epoch, logs=None):
+            elapsed = time.perf_counter() - self.epoch_started
+            self.epoch_times.append(elapsed)
+            print(f"    epoch {epoch + 1} time: {elapsed:.3f}s")
+
+        def on_train_end(self, logs=None):
+            total = time.perf_counter() - self.train_started
+            average = total / len(self.epoch_times) if self.epoch_times else 0.0
+            print(
+                f"[INFO] Training time: {total:.3f}s total, "
+                f"{average:.3f}s/epoch average"
+            )
+
+    callbacks.insert(0, EpochTimer())
     if real is not None:
         class RealEval(tf.keras.callbacks.Callback):
             def on_epoch_end(self, epoch, logs=None):

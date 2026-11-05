@@ -1,0 +1,5 @@
+cell: r3c2
+expected: 0
+predicted: 3
+confidence: 0.341182
+reason: false positive

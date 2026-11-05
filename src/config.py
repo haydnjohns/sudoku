@@ -10,8 +10,10 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
+VISION_ASSETS_DIR = ASSETS_DIR / "vision"
 
-DEMO_IMAGE_PATH = ASSETS_DIR / "demo.png"
+DEMO_IMAGE_PATH = VISION_ASSETS_DIR / "test grids" / "ss" / "demo.png"
+VISION_MODEL_PATH = VISION_ASSETS_DIR / "models" / "vis_model_new.tflite"
 
 
 # --------------------------------------------------------------------------

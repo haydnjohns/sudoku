@@ -8,7 +8,7 @@ from skimage.segmentation import clear_border
 if __package__ in (None, ""): sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import config
 
-MODEL_PATH = config.ASSETS_DIR / "vis_model.tflite"
+MODEL_PATH = config.VISION_MODEL_PATH
 DEMO_IMAGE_PATH = config.DEMO_IMAGE_PATH
 BOARD_IMAGE_SIZE = config.BOARD_IMAGE_SIZE #900
 GRID_SIZE = config.GRID_SIZE

@@ -8,7 +8,7 @@ import sys
 import cv2
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SRC_ROOT))
@@ -18,8 +18,8 @@ from src.vision.vis_cells import extract_cell, preprocess_digit
 
 
 EXPECTED = "9456732152473556498732481356"
-REAL_CELLS_ROOT = REPO_ROOT / "real_cells"
-DEFAULT_IMAGE = REPO_ROOT / "assets" / "camera_test.jpg"
+REAL_CELLS_ROOT = REPO_ROOT / "assets" / "vision" / "real_cells"
+DEFAULT_IMAGE = REPO_ROOT / "assets" / "vision" / "test grids" / "ss" / "camera_test_good.jpg"
 
 
 def parse_args() -> argparse.Namespace:
