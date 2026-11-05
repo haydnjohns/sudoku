@@ -32,7 +32,7 @@ def capture_image(width: int = 2592, height: int = 1944) -> np.ndarray:
     camera_start = time.perf_counter()
     process = subprocess.Popen(
         [
-            "rpi-cam",
+            "rpicam-jpeg",
             "-o", "-",
             "--width", str(width),
             "--height", str(height),

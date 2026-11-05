@@ -2,10 +2,11 @@
 
 import time
 
+# start timing here for inputs
 from solver.solver import solve_sudoku
 from vision.vis_board import capture_image
 from vision.vision import run_vision_pipeline
-
+# report import time
 
 def main() -> None:
     """Capture a Sudoku board, recognise it, and solve it."""
