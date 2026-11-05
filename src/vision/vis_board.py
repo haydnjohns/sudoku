@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import cv2
@@ -28,24 +29,43 @@ class RectifiedBoard:
 
 def capture_image(width: int = 2592, height: int = 1944) -> np.ndarray:
     """Capture an image using the Raspberry Pi camera."""
-    result = subprocess.run(
+    camera_start = time.perf_counter()
+    process = subprocess.Popen(
         [
-            "libcamera-jpeg",
+            "rpi-cam",
             "-o", "-",
             "--width", str(width),
             "--height", str(height),
             "--nopreview",
         ],
-        capture_output=True,
-        check=True
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+    print(
+        f"Camera launched in {time.perf_counter() - camera_start:.3f}s",
+        flush=True
+    )
+    stdout, stderr = process.communicate()
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(
+            process.returncode,
+            process.args,
+            output=stdout,
+            stderr=stderr
+        )
 
     image = cv2.imdecode(
-        np.frombuffer(result.stdout, dtype=np.uint8),
+        np.frombuffer(stdout, dtype=np.uint8),
         cv2.IMREAD_COLOR
     )
     if image is None:
         raise RuntimeError("Failed to decode captured image")
+
+    image = cv2.rotate(image, cv2.ROTATE_180)
+    print(
+        f"Image captured in {time.perf_counter() - camera_start:.3f}s",
+        flush=True
+    )
     return image
 
 
