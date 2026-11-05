@@ -5,12 +5,14 @@ description = "Sudoku-solving robot project"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "ai-edge-litert>=2.3.0",
     "gpiozero>=2.0.1.post3",
+    "ai-edge-litert>=2.0.0",
+    "keras>=3.15.1",
     "numpy>=2.5.4",
     "opencv-python-headless>=5.0.0.93",
     "scikit-image>=0.26.0",
     "scipy>=1.18.1",
+    "tensorflow>=2.21.0",
 ]
 
 [tool.uv]

@@ -1,9 +1,16 @@
 
+"""Capture, preprocess, detect, and perspective-correct a Sudoku board image."""
+
 from dataclasses import dataclass
 import subprocess
+import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import config
 
@@ -33,10 +40,13 @@ def capture_image(width: int = 2592, height: int = 1944) -> np.ndarray:
         check=True
     )
 
-    return cv2.imdecode(
+    image = cv2.imdecode(
         np.frombuffer(result.stdout, dtype=np.uint8),
         cv2.IMREAD_COLOR
     )
+    if image is None:
+        raise RuntimeError("Failed to decode captured image")
+    return image
 
 
 # --------------------------------------------------------------------------
@@ -156,7 +166,7 @@ def rectify_board(
     image: np.ndarray,
     corners: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Warp the board into a square, top-down image."""
+    """Warp the board into a square, top-down grayscale image."""
     size = config.BOARD_IMAGE_SIZE
 
     destination = np.array(
@@ -174,8 +184,13 @@ def rectify_board(
         destination
     )
 
+    grayscale = (
+        cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        if image.ndim == 3
+        else image
+    )
     warped = cv2.warpPerspective(
-        image,
+        grayscale,
         matrix,
         (size, size)
     )
@@ -227,11 +242,10 @@ def process_image(
 
 if __name__ == "__main__":
     image = cv2.imread(str(config.DEMO_IMAGE_PATH))
-
+    if image is None:
+        raise FileNotFoundError(f"Could not load demo image: {config.DEMO_IMAGE_PATH}")
     board = process_image(image, debug=True)
-
     print("Undistorted board corners:")
     print(board.corners)
-
     cv2.waitKey(0)
     cv2.destroyAllWindows()

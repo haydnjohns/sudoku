@@ -72,22 +72,3 @@ def calculate_board_pose(corners: np.ndarray) -> BoardPose:
         rotation_matrix=robot_T_board[:3, :3],
         transformation_matrix=robot_T_board
     )
-
-
-# --------------------------------------------------------------------------
-# Demo
-# --------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    from vis_board import capture_image, process_image
-
-    image = capture_image()
-    board = process_image(image)
-
-    pose = calculate_board_pose(board.corners)
-
-    print("Board position in robot coordinates (mm):")
-    print(pose.position_mm)
-
-    print("Board rotation:")
-    print(pose.rotation_matrix)
