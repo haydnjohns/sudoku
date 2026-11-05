@@ -39,7 +39,7 @@ def capture_image(width: int = 2592, height: int = 1944) -> np.ndarray:
     """Capture an image using the Raspberry Pi camera."""
     result = subprocess.run(
         [
-            "libcamera-jpeg",
+            "rpicam-jpeg",
             "-o", "-",
             "--width", str(width),
             "--height", str(height),
@@ -90,7 +90,6 @@ def main() -> None:
     run_remote_command(
         [
             "scp",
-            "-v",
             str(OUTPUT_PATH),
             f"{remote}:{REMOTE_PATH}",
         ],
