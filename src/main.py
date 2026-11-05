@@ -11,7 +11,7 @@ from vision.vision import run_vision_pipeline
 def main() -> None:
     """Capture a Sudoku board, recognise it, and solve it."""
     image = capture_image()
-    sudoku, _ = run_vision_pipeline(image)
+    sudoku, _, _ = run_vision_pipeline(image)
     solve_start = time.perf_counter()
     solve_sudoku(
         sudoku,

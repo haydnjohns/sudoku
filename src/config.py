@@ -11,7 +11,7 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
 
-DEMO_IMAGE_PATH = ASSETS_DIR / "camera_test_good.jpg"
+DEMO_IMAGE_PATH = ASSETS_DIR / "demo.png"
 
 
 # --------------------------------------------------------------------------

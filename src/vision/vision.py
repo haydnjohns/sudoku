@@ -25,18 +25,20 @@ except ImportError:
     from vis_geometry import BoardPose, calculate_board_pose
 
 
-def run_vision_pipeline(image: np.ndarray) -> tuple[np.ndarray, BoardPose]:
-    """Detect a board, recognise its digits, and estimate its pose."""
+def run_vision_pipeline(
+    image: np.ndarray
+) -> tuple[np.ndarray, BoardPose, np.ndarray]:
+    """Detect a board, recognise its digits, pose, and prediction vectors."""
     rectified_board = process_image(image)
     pose = calculate_board_pose(rectified_board.corners)
     ocr_start = time.perf_counter()
-    sudoku = recognise_board(rectified_board.image)
+    sudoku, prediction_vectors = recognise_board(rectified_board.image)
     print(
         f"OCR complete in {time.perf_counter() - ocr_start:.3f}s",
         flush=True
     )
 
-    return sudoku, pose
+    return sudoku, pose, prediction_vectors
 
 
 def main() -> None:
@@ -47,7 +49,7 @@ def main() -> None:
             f"Could not load demo image: {config.DEMO_IMAGE_PATH}"
         )
 
-    sudoku, _ = run_vision_pipeline(image)
+    sudoku, _, _ = run_vision_pipeline(image)
     print_sudoku(sudoku)
 
 

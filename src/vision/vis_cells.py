@@ -19,6 +19,7 @@ MIN_CONTOUR_AREA = 500
 CELL_MARGIN_RATIO = 0.25
 ADAPTIVE_THRESHOLD_BLOCK_SIZE = 11
 ADAPTIVE_THRESHOLD_C = 2
+MIN_PREDICTION_CONFIDENCE = 0.7
 DEBUG = 0
 
 
@@ -100,7 +101,10 @@ def load_digit_model():
     return interpreter
 
 
-def predict_digit(digit_image: np.ndarray, model) -> int:
+def predict_digit_with_vector(
+    digit_image: np.ndarray,
+    model
+) -> tuple[int, np.ndarray]:
 
     """Predict a digit using the TFLite model."""
 
@@ -113,23 +117,42 @@ def predict_digit(digit_image: np.ndarray, model) -> int:
     model.invoke()
     prediction = model.get_tensor(output_details["index"])
 
-    predicted_digit = int(np.argmax(prediction[0])) + 1
+    prediction_vector = prediction[0].copy()
+    predicted_digit = int(np.argmax(prediction_vector)) + 1
 
+    return predicted_digit, prediction_vector
+
+
+def predict_digit(digit_image: np.ndarray, model) -> int:
+    """Predict a digit using the TFLite model."""
+    predicted_digit, _ = predict_digit_with_vector(digit_image, model)
     return predicted_digit
 
 
-def recognise_board(board_image: np.ndarray) -> np.ndarray:
+def recognise_board(
+    board_image: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
 
     """Create a 9x9 NumPy array representing the Sudoku board from rectified board image."""
 
     model = load_digit_model()
     board = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int32)
+    prediction_vectors = np.zeros((GRID_SIZE, GRID_SIZE, 9), dtype=np.float32)
 
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
             cell = extract_cell(board_image, row, col)
             digit_image = preprocess_digit(cell)
-            if digit_image is not None:
-                board[row, col] = predict_digit(digit_image, model)
+            if digit_image is None:
+                continue
 
-    return board
+            predicted_digit, prediction_vector = predict_digit_with_vector(
+                digit_image,
+                model
+            )
+            prediction_vectors[row, col] = prediction_vector
+
+            if np.max(prediction_vector) >= MIN_PREDICTION_CONFIDENCE:
+                board[row, col] = predicted_digit
+
+    return board, prediction_vectors
