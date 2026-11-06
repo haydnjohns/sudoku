@@ -11,7 +11,7 @@ import numpy as np
 OUTPUT_PATH = Path(__file__).with_name("camera_test.jpg")
 REMOTE_USER = "haydnjohns"
 REMOTE_HOST = "192.168.1.118"
-REMOTE_PATH = "/Users/haydnjohns/Downloads/camera_test.jpg"
+REMOTE_PATH = "/Users/haydnjohns/Downloads/camera_test_{}.jpg".format(np.random.randint(0, 1000))
 
 
 def run_remote_command(command: list[str], description: str) -> None:

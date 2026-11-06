@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sudoku-like Grid</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #e8e8e8; font-family: system-ui, sans-serif; }
+
+  .controls {
+    max-width: 210mm; margin: 12px auto; padding: 12px 16px;
+    background: #fff; border-radius: 8px; display: flex; gap: 14px;
+    align-items: center; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  }
+  .controls label { font-size: 14px; }
+  .controls select, .controls button {
+    font-size: 14px; padding: 6px 10px; border-radius: 6px; border: 1px solid #999; background: #fafafa; cursor: pointer;
+  }
+  .controls button.primary { background: #222; color: #fff; border-color: #222; }
+
+  /* A4 sheet: 210mm x 297mm */
+  .sheet {
+    width: 210mm; height: 297mm; margin: 0 auto 20px; background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  #grid {
+    width: 180mm; height: 180mm; /* fits A4 width with 15mm margins */
+    display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+    box-sizing: border-box;
+  }
+  .cell {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11mm; line-height: 1; color: #000; overflow: hidden;
+    border-style: solid; border-color: #000;
+  }
+
+  @media print {
+    html, body { background: #fff; }
+    .controls { display: none; }
+    .sheet { margin: 0; box-shadow: none; page-break-after: avoid; break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <label>Starting row of 1s:
+    <select id="startRow"></select>
+  </label>
+  <button id="regen" class="primary">Regenerate (fonts &amp; lines)</button>
+  <button id="print">Print</button>
+  <span id="info" style="font-size:12px;color:#555;"></span>
+</div>
+
+<div class="sheet"><div id="grid"></div></div>
+
+<script>
+(function () {
+  const fonts = [
+    'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana',
+    'Trebuchet MS', 'Impact', 'Palatino Linotype', 'Garamond',
+    'Lucida Console', 'Tahoma', 'Century Gothic', 'Copperplate',
+    'Futura', 'Optima', 'Didot', 'Rockwell', 'Baskerville',
+    'Bookman', 'Gill Sans', 'Franklin Gothic Medium', 'Consolas', 'Cambria',
+    'serif', 'sans-serif', 'monospace'
+  ];
+  const weights = ['normal', 'bold'];
+  const styles = ['normal', 'italic'];
+
+  // Line weight limits (px at 96dpi -> ~mm): primary 2–5mm range expressed in px
+  const LIMITS = {
+    primary:   { min: 2.5, max: 6 },
+    secondary: { min: 1.5, max: 4 },
+    tertiary:  { min: 0.5, max: 1.5 }
+  };
+  const STEP = 0.25;
+
+  const startSel = document.getElementById('startRow');
+  for (let i = 1; i <= 9; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = 'Row ' + i;
+    startSel.appendChild(o);
+  }
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const snap = v => Math.round(v / STEP) * STEP;
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  function randomWeights() {
+    // tertiary strictly less than secondary; primary >= secondary
+    let p, s, t, guard = 0;
+    do {
+      p = snap(rand(LIMITS.primary.min, LIMITS.primary.max));
+      s = snap(rand(LIMITS.secondary.min, LIMITS.secondary.max));
+      t = snap(rand(LIMITS.tertiary.min, LIMITS.tertiary.max));
+      guard++;
+    } while (!(p >= s && s > t) && guard < 1000);
+    // Fallback enforcement (should essentially never be needed)
+    if (!(p >= s && s > t)) { t = 0.5; s = 1.5; p = 3; }
+    return { p, s, t };
+  }
+
+  function build() {
+    const start = parseInt(startSel.value, 10) - 1; // 0-based row holding the 1s
+    const { p, s, t } = randomWeights();
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+
+    // Edge/divider width helper: between index i-1 and i (i in 1..8), or outer edges 0 / 9
+    const divider = i => {
+      if (i === 0 || i === 9) return p;
+      return i % 3 === 0 ? s : t;
+    };
+
+    for (let r = 0; r < 9; r++) {
+      const digit = ((r - start + 9) % 9) + 1;
+      for (let c = 0; c < 9; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = digit;
+        cell.style.fontFamily = `"${pick(fonts)}", ${pick(['serif','sans-serif','monospace'])}`;
+        cell.style.fontWeight = pick(weights);
+        cell.style.fontStyle = pick(styles);
+        // Each cell draws its own top & left borders, plus right/bottom only on outer edges,
+        // so that dividers are never doubled.
+        cell.style.borderWidth = `${divider(r)}px ${c === 8 ? p : 0}px ${r === 8 ? p : 0}px ${divider(c)}px`;
+        grid.appendChild(cell);
+      }
+    }
+
+    document.getElementById('info').textContent =
+      `Line weights — primary: ${p}px, secondary: ${s}px, tertiary: ${t}px`;
+  }
+
+  startSel.addEventListener('change', build);
+  document.getElementById('regen').addEventListener('click', build);
+  document.getElementById('print').addEventListener('click', () => window.print());
+  build();
+})();
+</script>
+</body>
+</html>

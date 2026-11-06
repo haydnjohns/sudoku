@@ -1,5 +1,0 @@
-cell: r4c4
-expected: 3
-predicted: None
-confidence: 0.000000
-reason: missed digit
