@@ -1,0 +1,8 @@
+cell: r1c8
+expected: 5
+predicted: 6
+confidence: 0.803175
+contour_area: 889.5
+contour_bounding_box_area: 1333
+contour_area_threshold: 300
+reason: incorrect OCR

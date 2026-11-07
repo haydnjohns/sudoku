@@ -1,0 +1,8 @@
+cell: r3c2
+expected: 5
+predicted: None
+confidence: 0.408628
+contour_area: 400.0
+contour_bounding_box_area: 975
+contour_area_threshold: 300
+reason: OCR confidence below threshold (threshold=0.500000, measured=0.408628)

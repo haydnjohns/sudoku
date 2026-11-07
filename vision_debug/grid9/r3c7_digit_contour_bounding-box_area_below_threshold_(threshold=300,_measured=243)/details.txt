@@ -1,0 +1,8 @@
+cell: r3c7
+expected: 4
+predicted: None
+confidence: 0.000000
+contour_area: 165.5
+contour_bounding_box_area: 243
+contour_area_threshold: 300
+reason: digit contour bounding-box area below threshold (threshold=300, measured=243)
