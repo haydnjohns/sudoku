@@ -1,24 +1,27 @@
-import subprocess
+#!/usr/bin/env python3
+"""Capture chessboard calibration images from a Raspberry Pi camera.
+
+Press Enter to capture, q (or e) to quit. If a remote host is given (argument
+or CALIBRATION_REMOTE_HOST), the images are copied there with scp on exit.
+"""
 import argparse
 import os
-import signal
+import subprocess
 import time
 from pathlib import Path
 
-import cv2
+from picamera2 import Picamera2
 
 IMAGE_DIR = Path(__file__).resolve().parents[2] / "assets" / "vision" / "camera_calibration"
-CAPTURE_PATH = IMAGE_DIR / ".calibration_capture.jpg"
+REMOTE_DIR = "assets/vision/camera_calibration/"
+RESOLUTION = (3280, 2464)
 
 
 def next_image_path(directory):
-    directory.mkdir(parents=True, exist_ok=True)
-    counter = 0
-    while True:
-        path = directory / f"calibration_{counter:04d}.jpg"
-        if not path.exists():
-            return path
-        counter += 1
+    index = len(list(directory.glob("calibration_*.jpg")))
+    while (path := directory / f"calibration_{index:04d}.jpg").exists():
+        index += 1
+    return path
 
 
 def transfer_images(directory, remote_host):
@@ -26,47 +29,17 @@ def transfer_images(directory, remote_host):
         print("No remote host supplied; images remain local.")
         return
 
-    destination = f"{remote_host}:assets/vision/camera_calibration/"
-    result = subprocess.run(["scp", "-r", str(directory), destination], check=False)
+    images = sorted(directory.glob("calibration_*.jpg"))
+    if not images:
+        print("No images to transfer.")
+        return
+
+    destination = f"{remote_host}:{REMOTE_DIR}"
+    result = subprocess.run(["scp", *map(str, images), destination], check=False)
     if result.returncode == 0:
-        print(f"Transferred calibration images to {destination}")
+        print(f"Transferred {len(images)} images to {destination}")
     else:
         print("Failed to transfer calibration images.")
-
-
-def start_camera():
-    return subprocess.Popen(
-        [
-            "rpicam-jpeg",
-            "--signal",
-            "--timeout", "0",
-            "-o", str(CAPTURE_PATH),
-            "--width", "3280",
-            "--height", "2464",
-            "--nopreview",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-
-
-def capture_image(camera_process):
-    if camera_process.poll() is not None:
-        error = camera_process.stderr.read().strip()
-        detail = f": {error}" if error else ""
-        raise RuntimeError(f"Camera process exited before capture{detail}")
-
-    previous_mtime = CAPTURE_PATH.stat().st_mtime_ns if CAPTURE_PATH.exists() else 0
-    camera_process.send_signal(signal.SIGUSR1)
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        if CAPTURE_PATH.exists() and CAPTURE_PATH.stat().st_mtime_ns > previous_mtime:
-            image = cv2.imread(str(CAPTURE_PATH), cv2.IMREAD_COLOR)
-            if image is not None:
-                return image
-        time.sleep(0.05)
-    raise RuntimeError("Timed out waiting for camera capture")
 
 
 def main():
@@ -80,36 +53,38 @@ def main():
     args = parser.parse_args()
 
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    camera_process = start_camera()
+
+    camera = Picamera2()
+    camera.configure(camera.create_still_configuration(main={"size": RESOLUTION}))
+    camera.options["quality"] = 95
+    camera.start()
+    time.sleep(2)  # let auto exposure / white balance settle
+
     print("Press Enter to capture an image; enter e or q to exit.")
     try:
         while True:
-            command = input("Capture> ").strip().lower()
+            try:
+                command = input("Capture> ").strip().lower()
+            except EOFError:
+                break
             if command in {"e", "q"}:
                 break
             if command:
                 print("Press Enter to capture, or enter e/q to exit.")
                 continue
 
+            path = next_image_path(IMAGE_DIR)
             try:
-                image = capture_image(camera_process)
-            except RuntimeError as error:
+                camera.capture_file(str(path))
+            except Exception as error:
                 print(f"Capture failed: {error}")
                 continue
-
-            image_path = next_image_path(IMAGE_DIR)
-            if cv2.imwrite(str(image_path), image):
-                print(f"Captured image: {image_path}")
-            else:
-                print(f"Failed to save image: {image_path}")
+            print(f"Captured image: {path}")
+    except KeyboardInterrupt:
+        print()
     finally:
-        camera_process.terminate()
-        try:
-            camera_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            camera_process.kill()
-            camera_process.wait()
-        CAPTURE_PATH.unlink(missing_ok=True)
+        camera.stop()
+        camera.close()
 
     transfer_images(IMAGE_DIR, args.remote_host)
 
