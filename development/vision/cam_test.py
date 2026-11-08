@@ -9,9 +9,9 @@ import numpy as np
 
 
 OUTPUT_PATH = Path(__file__).with_name("camera_test.jpg")
-REMOTE_USER = "haydnjohns"
-REMOTE_HOST = "192.168.1.118"
-REMOTE_PATH = "/Users/haydnjohns/Downloads/camera_test_{}.jpg".format(np.random.randint(0, 1000))
+REMOTE_USER = "hjohns"
+REMOTE_HOST = "192.168.1.117"
+REMOTE_PATH = "/home/hjohns/Downloads/camera_test_{}.jpg".format(np.random.randint(0, 1000))
 
 
 def run_remote_command(command: list[str], description: str) -> None:
@@ -83,7 +83,7 @@ def main() -> None:
             "-o",
             "BatchMode=yes",
             remote,
-            "test -d /Users/haydnjohns/Downloads",
+            "test -d /home/hjohns/Downloads",
         ],
         "Remote destination check",
     )
@@ -112,7 +112,7 @@ def main() -> None:
             "-o",
             "BatchMode=yes",
             remote,
-            "open",
+            "xdg-open",
             REMOTE_PATH,
         ],
         "Remote image open",
