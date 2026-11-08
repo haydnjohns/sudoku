@@ -42,7 +42,7 @@ def run_remote_command(
 # --------------------------------------------------------------------------
 
 def capture_image() -> np.ndarray:
-    capture_args = ['libcamera-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
+    capture_args = ['rpicam-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
     result = subprocess.run(capture_args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     image = cv2.imdecode(np.frombuffer(result.stdout, dtype=np.uint8), cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # immediately convert to grayscale to speed up processing
