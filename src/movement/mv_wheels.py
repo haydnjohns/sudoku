@@ -131,5 +131,5 @@ if __name__ == "__main__":
     sleep(DEMO_WAIT)
 
     print("CW Pivot")
-    pivot("centre", DEMO_ANGLE)
+    pivot("centre", -DEMO_ANGLE)
     sleep(DEMO_WAIT)
