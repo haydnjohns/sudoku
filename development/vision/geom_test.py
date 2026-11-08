@@ -117,6 +117,23 @@ ground_points = ground_points_3d[:, :2] # discard Z
 bottom_left_ground_point = ground_points[3].copy()
 ground_points -= bottom_left_ground_point
 
+board_width_left = np.linalg.norm(ground_points[1] - ground_points[0])
+board_width_right = np.linalg.norm(ground_points[2] - ground_points[3])
+board_width = (board_width_left + board_width_right) / 2
+board_height_top = np.linalg.norm(ground_points[3] - ground_points[0])
+board_height_bottom = np.linalg.norm(ground_points[2] - ground_points[1])
+board_height = (board_height_top + board_height_bottom) / 2
+
+top_vector = ground_points[1] - ground_points[0]
+bottom_vector = ground_points[2] - ground_points[3]
+left_vector = ground_points[3] - ground_points[0]
+right_vector = ground_points[2] - ground_points[1]
+theta_top = np.degrees(np.arctan2(top_vector[1], top_vector[0]))
+theta_bottom = np.degrees(np.arctan2(bottom_vector[1], bottom_vector[0]))
+theta_left = np.degrees(np.arctan2(left_vector[0], left_vector[1]))
+theta_right = np.degrees(np.arctan2(right_vector[0], right_vector[1]))
+board_rotation_angle = np.mean([theta_left, theta_right, theta_top, theta_bottom])
+
 
 # ============================================================
 # OUTPUTS
@@ -134,6 +151,11 @@ for index, (pixel, camera_ray, ground_ray, ray_parameter, ground_point) in enume
     print(f"  global-frame ray:  {np.array2string(ground_ray, precision=6)}")
     print(f"  t (Z=0):           {ray_parameter:.6f}")
     print(f"  ground point (mm): {np.array2string(ground_point, precision=6)}")
+
+print(f"Board width: {board_width:.2f} mm ({board_width_left:.2f}, {board_width_right:.2f})")
+print(f"Board height: {board_height:.2f} mm ({board_height_top:.2f}, {board_height_bottom:.2f})")   
+print(f"Camera position relative to bottom-left corner: {np.array2string(bottom_left_ground_point, precision=3)} mm")
+print(f"Board rotation angle: {board_rotation_angle:.2f} degrees ({theta_top:.2f}, {theta_bottom:.2f}, {theta_left:.2f}, {theta_right:.2f})")
 
 
 
