@@ -25,7 +25,7 @@ import time
 # GET IMAGE
 # ============================================================
 # image = cv2.imread("image.jpg")  # if we want to use a test image
-capture_args = ['libcamera-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
+capture_args = ['rpicam-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
 result = subprocess.run(capture_args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 image = cv2.imdecode(np.frombuffer(result.stdout, dtype=np.uint8), cv2.IMREAD_COLOR)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # immediately convert to grayscale to speed up processing
