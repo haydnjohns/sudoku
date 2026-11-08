@@ -50,30 +50,25 @@ def main():
     args = parser.parse_args()
 
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    print("Press space to capture an image; press e or Esc to exit.")
-    cv2.namedWindow("Calibration", cv2.WINDOW_NORMAL)
+    print("Press Enter to capture an image; enter e or q to exit.")
+    while True:
+        command = input("Capture> ").strip().lower()
+        if command in {"e", "q"}:
+            break
+        if command:
+            print("Press Enter to capture, or enter e/q to exit.")
+            continue
 
-    try:
-        while True:
-            key = cv2.waitKey(50) & 0xFF
-            if key in (ord("e"), 27):
-                break
-            if key != ord(" "):
-                continue
+        image = capture_image()
+        if image is None:
+            print("Capture failed.")
+            continue
 
-            image = capture_image()
-            if image is None:
-                print("Capture failed.")
-                continue
-
-            image_path = next_image_path(IMAGE_DIR)
-            if cv2.imwrite(str(image_path), image):
-                cv2.imshow("Calibration", image)
-                print(f"Captured image: {image_path}")
-            else:
-                print(f"Failed to save image: {image_path}")
-    finally:
-        cv2.destroyAllWindows()
+        image_path = next_image_path(IMAGE_DIR)
+        if cv2.imwrite(str(image_path), image):
+            print(f"Captured image: {image_path}")
+        else:
+            print(f"Failed to save image: {image_path}")
 
     transfer_images(IMAGE_DIR, args.remote_host)
 
