@@ -97,9 +97,9 @@ camera_pitch = np.radians(camera_pitch_degrees)
 cos_pitch = np.cos(camera_pitch)
 sin_pitch = np.sin(camera_pitch)
 pitch_rotation_matrix = np.array([
-    [1.0,        0.0,         0.0],
-    [0.0, cos_pitch, -sin_pitch],
-    [0.0, sin_pitch,  cos_pitch]
+    [1.0,   0.0,        0.0],
+    [0.0, -cos_pitch,  sin_pitch],
+    [0.0, -sin_pitch, -cos_pitch]
 ], dtype=np.float64)
 ground_rays = (pitch_rotation_matrix @ camera_rays.T).T
 
