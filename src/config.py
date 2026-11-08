@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
 VISION_ASSETS_DIR = ASSETS_DIR / "vision"
 
-DEMO_IMAGE_PATH = VISION_ASSETS_DIR / "test grids" / "ss" / "demo.png"
+DEMO_IMAGE_PATH = VISION_ASSETS_DIR / "test grids" / "weblarge.jpg"
 VISION_MODEL_PATH = VISION_ASSETS_DIR / "models" / "vis_model_new.tflite"
 
 
@@ -25,6 +25,9 @@ CAMERA_MATRIX = np.array([
     [0.0, 2644.434621507731, 1106.6683119862594],
     [0.0, 0.0, 1.0]
 ], dtype=np.float32)
+
+# Set this to False if the camera is mounted in its normal orientation.
+CAMERA_MOUNTED_UPSIDE_DOWN = True
 
 DISTORTION_COEFFICIENTS = np.array([
     0.19930490026457645,
@@ -50,11 +53,18 @@ ROBOT_T_CAMERA = np.eye(4, dtype=np.float64)
 # Sudoku board dimensions
 # --------------------------------------------------------------------------
 
-BOARD_WIDTH_MM = 180.0
-BOARD_HEIGHT_MM = 180.0
+CAMERA_HEIGHT = 73  # Camera pose relative to the board plane.
+CAMERA_ANGLE = 29   # Degrees down from horizontal; the geometry module uses this convention.
 
 BOARD_IMAGE_SIZE = 900
 GRID_SIZE = 9
+
+# Robot geometry and initial board-relative position.
+STAMPER_SETBACK = 16.0
+CAMERA_TO_STAMPER_OFFSET_MM = -10.0
+ROW_TRAVEL_TOLERANCE = 5.0
+MOVEMENT_WAIT_SECONDS = 0.1
+STAMP_WAIT_SECONDS = 1.0
 
 
 # --------------------------------------------------------------------------
@@ -62,13 +72,7 @@ GRID_SIZE = 9
 # --------------------------------------------------------------------------
 
 GAUSSIAN_KERNEL = (9, 9)
-
 ADAPTIVE_THRESHOLD_BLOCK_SIZE = 11
 ADAPTIVE_THRESHOLD_C = 2
-
 MORPHOLOGY_KERNEL_SIZE = 3
 
-
-# --------------------------------------------------------------------------
-# Digit recognition
-# --------------------------------------------------------------------------

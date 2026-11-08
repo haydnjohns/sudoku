@@ -5,13 +5,14 @@ import time
 # start timing here for inputs
 from solver.solver import solve_sudoku
 from vision.vis_board import capture_image
-from vision.vision import run_vision_pipeline
+from vision.vision import print_board_pose, run_vision_pipeline
 # report import time
 
 def main() -> None:
     """Capture a Sudoku board, recognise it, and solve it."""
     image = capture_image()
-    sudoku, _, _ = run_vision_pipeline(image)
+    sudoku, pose, _ = run_vision_pipeline(image)
+    print_board_pose(pose)
     solve_start = time.perf_counter()
     solve_sudoku(
         sudoku,

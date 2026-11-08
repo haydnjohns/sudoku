@@ -18,11 +18,26 @@ from solver.solver import print_sudoku
 try:
     from .vis_board import process_image
     from .vis_cells import recognise_board
-    from .vis_geometry import BoardPose, calculate_board_pose
+    from .vis_board import BoardPose
 except ImportError:
     from vis_board import process_image
     from vis_cells import recognise_board
-    from vis_geometry import BoardPose, calculate_board_pose
+    from vis_board import BoardPose
+
+
+def print_board_pose(pose: BoardPose) -> None:
+    """Print the calculated stamper position and board dimensions."""
+    print(
+        "Board geometry (stamper position, board frame):\n"
+        f"  x: {pose.x:.2f} mm\n"
+        f"  y: {pose.y:.2f} mm\n"
+        f"  theta: {pose.theta:.2f} degrees\n"
+        f"  dx_top: {pose.dx_top:.2f} mm\n"
+        f"  dx_btm: {pose.dx_btm:.2f} mm\n"
+        f"  dy_left: {pose.dy_left:.2f} mm\n"
+        f"  dy_top: {pose.dy_top:.2f} mm",
+        flush=True,
+    )
 
 
 def run_vision_pipeline(
@@ -30,7 +45,6 @@ def run_vision_pipeline(
 ) -> tuple[np.ndarray, BoardPose, np.ndarray]:
     """Detect a board, recognise its digits, pose, and prediction vectors."""
     rectified_board = process_image(image)
-    pose = calculate_board_pose(rectified_board.corners)
     ocr_start = time.perf_counter()
     sudoku, prediction_vectors = recognise_board(rectified_board.image)
     print(
@@ -38,7 +52,7 @@ def run_vision_pipeline(
         flush=True
     )
 
-    return sudoku, pose, prediction_vectors
+    return sudoku, rectified_board.pose, prediction_vectors
 
 
 def main() -> None:
@@ -49,7 +63,8 @@ def main() -> None:
             f"Could not load demo image: {config.DEMO_IMAGE_PATH}"
         )
 
-    sudoku, _, _ = run_vision_pipeline(image)
+    sudoku, pose, _ = run_vision_pipeline(image)
+    print_board_pose(pose)
     print_sudoku(sudoku)
 
 
