@@ -39,19 +39,23 @@ def start_camera():
         [
             "rpicam-jpeg",
             "--signal",
+            "--timeout", "0",
             "-o", str(CAPTURE_PATH),
             "--width", "3280",
             "--height", "2464",
             "--nopreview",
         ],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
 
 def capture_image(camera_process):
     if camera_process.poll() is not None:
-        raise RuntimeError("Camera process exited before capture")
+        error = camera_process.stderr.read().strip()
+        detail = f": {error}" if error else ""
+        raise RuntimeError(f"Camera process exited before capture{detail}")
 
     previous_mtime = CAPTURE_PATH.stat().st_mtime_ns if CAPTURE_PATH.exists() else 0
     camera_process.send_signal(signal.SIGUSR1)
