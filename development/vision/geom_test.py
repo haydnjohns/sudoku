@@ -1,200 +1,134 @@
-
 import cv2
 import numpy as np
-from scipy.optimize import least_squares
 
-from dataclasses import dataclass
-import subprocess
-# import sys
-import time
-# from pathlib import Path
-
-# import cv2
-# import numpy as np
-
-# if __package__ in (None, ""):
-#     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# import config
-
-
-
-
+np.set_printoptions(precision=4, suppress=True)
 
 # ============================================================
-# GET IMAGE
+# 1. LOAD IMAGE
 # ============================================================
-# image = cv2.imread("image.jpg")  # if we want to use a test image
-capture_args = ['rpicam-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
-result = subprocess.run(capture_args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-image = cv2.imdecode(np.frombuffer(result.stdout, dtype=np.uint8), cv2.IMREAD_COLOR)
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # immediately convert to grayscale to speed up processing
+image = cv2.imread("assets/vision/geomtest.jpg")
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+image_height, image_width = gray.shape[:2]
 
 # ============================================================
-# DISTORT
+# 2. CAMERA PROPERTIES (manual)
 # ============================================================
-original_camera_matrix = np.array([
-    [2650.9964176101485, 0.0, 1638.4541745042789],
-    [0.0, 2644.434621507731, 1106.6683119862594],
-    [0.0, 0.0, 1.0]
-], dtype=np.float32)
+focal_length_mm = 3.04
+sensor_width_mm = 3.68
+sensor_height_mm = 2.76
+pixel_size_x = sensor_width_mm / image_width     # mm per pixel
+pixel_size_y = sensor_height_mm / image_height
 
-distortion_coefficients = np.array([
-    0.19930490026457645,
-    -0.2903695599399088,
-    -0.007406225233953261,
-    0.005002318775684634,
-    -0.5143858238250185
-], dtype=np.float32)
-
-camera_height = 112.1 # mm
-camera_pitch_degrees = 47.2 # degrees
-
-image_height, image_width = image.shape[:2]
-image_size = (image_width, image_height)
-
-new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(original_camera_matrix, distortion_coefficients, image_size, alpha=1)
-undistorted_image = cv2.undistort(image, original_camera_matrix, distortion_coefficients, None, new_camera_matrix)
+camera_height = 112.1          # mm above the ground
+tilt_from_vertical_deg = 47.2    # 0 = looking straight down, 90 = looking at horizon
+tilt = np.radians(tilt_from_vertical_deg)
 
 # ============================================================
-# PRECPROCESS
+# 3. FIND CORNERS (pixels)
 # ============================================================
-blurred = cv2.GaussianBlur(gray, (9, 9), 0) # update to use the undistorted image eventually
-binary = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-binary = cv2.bitwise_not(binary)  # lines/ink become white
-kernel = np.ones(3 * 2, np.uint8)
-binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+blurred = cv2.GaussianBlur(gray, (9, 9), 0)
+binary = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                               cv2.THRESH_BINARY, 11, 2)
+binary = cv2.bitwise_not(binary)
+binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
 
-# ============================================================
-# GET CORNERS
-# ============================================================
 contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 contours = sorted(contours, key=cv2.contourArea, reverse=True)
 for contour in contours:
-    approximation = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-    if len(approximation) == 4:
+    approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
+    if len(approx) == 4:
         break
 else:
     raise ValueError("Could not find Sudoku board")
 
-# Sort TL, TR, BR, BL
-points = approximation.reshape(4, 2).astype(np.float32)                 # Get corner points from contours
-points_sorted_by_y = points[np.argsort(points[:, 1])]                   # Sort by y-coordinate to separate top and bottom rows
-top_row = points_sorted_by_y[:2]                                        # Extract top row
-bottom_row = points_sorted_by_y[2:]                                     # Extract bottom row
-top_left, top_right = top_row[np.argsort(top_row[:, 0])]
-bottom_left, bottom_right = bottom_row[np.argsort(bottom_row[:, 0])]
-corner_pixels = np.array([top_left, top_right, bottom_right, bottom_left],dtype=np.float32,)
-
+pts = approx.reshape(4, 2).astype(np.float64)
+by_y = pts[np.argsort(pts[:, 1])]
+top_left, top_right = by_y[:2][np.argsort(by_y[:2, 0])]
+bottom_left, bottom_right = by_y[2:][np.argsort(by_y[2:, 0])]
+corner_pixels = np.array([top_left, top_right, bottom_right, bottom_left])  # TL, TR, BR, BL
+names = ["top-left", "top-right", "bottom-right", "bottom-left"]
 
 # ============================================================
-# 3. CONVERT PIXEL COORDINATES INTO CAMERA RAYS
+# 4. CAMERA FRAME: origin at sensor centre
+#    X = right, Y = down the sensor, Z = away from the sensor (out of the lens)
+#    Pixel (u, v) -> mm. No flip is needed because v already increases downward.
+#    Each corner becomes a vector (x, y, f) pointing from the sensor centre
+#    out through that pixel.
 # ============================================================
-inverse_camera_matrix = np.linalg.inv(original_camera_matrix)
-homogeneous_pixels = np.column_stack((corner_pixels, np.ones(4))) # [u, v] --> [u, v, 1].
-camera_rays = (inverse_camera_matrix @ homogeneous_pixels.T).T # in camera frame assuming it faces forward
-camera_pitch = np.radians(camera_pitch_degrees)
-cos_pitch = np.cos(camera_pitch)
-sin_pitch = np.sin(camera_pitch)
-pitch_rotation_matrix = np.array([
-    [1.0,   0.0,        0.0],
-    [0.0, -cos_pitch,  sin_pitch],
-    [0.0, -sin_pitch, -cos_pitch]
-], dtype=np.float64)
-ground_rays = (pitch_rotation_matrix @ camera_rays.T).T
+u = corner_pixels[:, 0]
+v = corner_pixels[:, 1]
+vectors_cam = np.column_stack((
+    (u - image_width / 2) * pixel_size_x,     # X (mm)
+    (v - image_height / 2) * pixel_size_y,    # Y (mm)
+    np.full(4, focal_length_mm),              # Z (mm)
+))
 
-
-# ============================================================
-# 5. INTERSECT EACH RAY WITH THE GROUND PLANE
-# ============================================================
-
-# P(t) = camera_position + t * ground_ray
-# t = -camera_height / ray_z
-camera_position = np.array([0.0, 0.0, camera_height])
-ray_parameters = (-camera_height / ground_rays[:, 2])
-ground_points_3d = (camera_position + ray_parameters[:, np.newaxis] * ground_rays)
-ground_points = ground_points_3d[:, :2] # discard Z
-bottom_left_ground_point = ground_points[3].copy()
-ground_points -= bottom_left_ground_point
-
-board_width_left = np.linalg.norm(ground_points[1] - ground_points[0])
-board_width_right = np.linalg.norm(ground_points[2] - ground_points[3])
-board_width = (board_width_left + board_width_right) / 2
-board_height_top = np.linalg.norm(ground_points[3] - ground_points[0])
-board_height_bottom = np.linalg.norm(ground_points[2] - ground_points[1])
-board_height = (board_height_top + board_height_bottom) / 2
-
-top_vector = ground_points[1] - ground_points[0]
-bottom_vector = ground_points[2] - ground_points[3]
-left_vector = ground_points[3] - ground_points[0]
-right_vector = ground_points[2] - ground_points[1]
-theta_top = np.degrees(np.arctan2(top_vector[1], top_vector[0]))
-theta_bottom = np.degrees(np.arctan2(bottom_vector[1], bottom_vector[0]))
-theta_left = np.degrees(np.arctan2(left_vector[0], left_vector[1]))
-theta_right = np.degrees(np.arctan2(right_vector[0], right_vector[1]))
-board_rotation_angle = np.mean([theta_left, theta_right, theta_top, theta_bottom])
-
+print("\n=== CAMERA FRAME VECTORS (mm) [X right, Y down, Z forward] ===")
+for n, p, vec in zip(names, corner_pixels, vectors_cam):
+    print(f"{n:13s} pixel=({p[0]:7.1f}, {p[1]:7.1f})  vector={vec}")
 
 # ============================================================
-# OUTPUTS
+# 5. CAMERA FRAME -> GLOBAL FRAME (axes only, no translation yet)
+#    Global axes: x = right across the page, y = up the page (away from camera),
+#                 z = up out of the page.
+#    Columns below are the camera's X, Y, Z axes written in global axes:
+#      camera X (right)   = ( 1,         0,          0)
+#      camera Y (down)    = ( 0, -cos(t),    -sin(t))
+#      camera Z (forward) = ( 0,  sin(t),    -cos(t))
+#    t = tilt from vertical. Check: t=0 -> Z=(0,0,-1) straight down,
+#    camera Y=(0,-1,0) so image-down points back toward the camera.
 # ============================================================
-print("\nCorner geometry")
-print("==============")
-for index, (pixel, camera_ray, ground_ray, ray_parameter, ground_point) in enumerate(
-    zip(corner_pixels, camera_rays, ground_rays, ray_parameters, ground_points),
-    start=1,
-):
-    corner_name = ("top-left", "top-right", "bottom-right", "bottom-left")[index - 1]
-    print(f"{corner_name}:")
-    print(f"  pixel coordinates: ({pixel[0]:.2f}, {pixel[1]:.2f})")
-    print(f"  camera-frame ray:  {np.array2string(camera_ray, precision=6)}")
-    print(f"  global-frame ray:  {np.array2string(ground_ray, precision=6)}")
-    print(f"  t (Z=0):           {ray_parameter:.6f}")
-    print(f"  ground point (mm): {np.array2string(ground_point, precision=6)}")
+R_cam_to_global = np.array([
+    [1.0,  0.0,          0.0],
+    [0.0, -np.cos(tilt), np.sin(tilt)],
+    [0.0, -np.sin(tilt), -np.cos(tilt)],
+])
+vectors_global = (R_cam_to_global @ vectors_cam.T).T
 
-print(f"Board width: {board_width:.2f} mm ({board_width_left:.2f}, {board_width_right:.2f})")
-print(f"Board height: {board_height:.2f} mm ({board_height_top:.2f}, {board_height_bottom:.2f})")   
-print(f"Camera position relative to bottom-left corner: {np.array2string(bottom_left_ground_point, precision=3)} mm")
-print(f"Board rotation angle: {board_rotation_angle:.2f} degrees ({theta_top:.2f}, {theta_bottom:.2f}, {theta_left:.2f}, {theta_right:.2f})")
-
-
+print("\n=== VECTORS IN GLOBAL FRAME (mm) [x right, y up page, z up] ===")
+for n, vec in zip(names, vectors_global):
+    print(f"{n:13s} {vec}")
 
 # ============================================================
-# 6. FIT AN IDEAL RECTANGLE TO THE FOUR GROUND POINTS
+# 6. SCALE EACH VECTOR TO REACH THE GROUND (global z = 0)
+#    Camera (lens) position in global axes: (0, 0, camera_height).
+#    Point on ray = camera + K * vector.
+#    z: camera_height + K * vz = 0  ->  K = -camera_height / vz
+#    vz must be negative, so K must be positive.
 # ============================================================
+K = -camera_height / vectors_global[:, 2]
 
-# def calculate_rectangle_corners(parameters):
-#     centre_x, centre_y, width, height, angle = parameters
-#     centre = np.array([centre_x, centre_y])
-#     side_a = np.array([np.cos(angle), np.sin(angle)])
-#     side_b = np.array([-np.sin(angle), np.cos(angle)])
-#     corner_1 = centre - (width / 2) * side_a - (height / 2) * side_b
-#     corner_2 = centre + (width / 2) * side_a - (height / 2) * side_b
-#     corner_3 = centre + (width / 2) * side_a + (height / 2) * side_b
-#     corner_4 = centre - (width / 2) * side_a + (height / 2) * side_b
-#     return np.array([corner_1, corner_2, corner_3, corner_4])
+print("\n=== K (scale along each vector so global z = 0) ===")
+for n, k in zip(names, K):
+    print(f"{n:13s} K = {k:.4f}")
+if np.any(K <= 0):
+    print("WARNING: K <= 0 for at least one corner. A ray points above the horizon or the tilt convention is wrong.")
 
-# def rectangle_residuals(parameters):
-#     estimated_corners = calculate_rectangle_corners(parameters)
-#     return (ground_points - estimated_corners).ravel()
+# ============================================================
+# 7. GROUND POINTS, ORIGIN DIRECTLY UNDER THE CAMERA
+# ============================================================
+ground_under_camera = K[:, None] * vectors_global     # x, y, z (z should be -camera_height)
+ground_xy_under_camera = ground_under_camera[:, :2]   # drop z (it cancels to the ground plane)
 
-# initial_centre = np.mean(ground_points,axis=0)                          # Estimate the rectangle centre as the average of the four observed ground-plane points.
-# initial_width = np.linalg.norm(ground_points[1] - ground_points[0])     # Estimate width from the distance between corners 0 and 1.
-# initial_height = np.linalg.norm(ground_points[2] - ground_points[1])    # Estimate height from the distance between corners 1 and 2.
-# initial_angle = np.arctan2(ground_points[1, 1] - ground_points[0, 1], ground_points[1, 0] - ground_points[0, 0]) # Estimate the initial orientation from the first side.
-# initial_parameters = np.array([initial_centre[0],initial_centre[1],initial_width,initial_height,initial_angle]) # Combine the initial estimates into one parameter array.
+# ============================================================
+# 8. GROUND FRAME: re-centre so bottom-left = (0, 0)
+#    x increases right across the page, y increases up the page.
+# ============================================================
+bl = ground_xy_under_camera[3].copy()
+ground_points = ground_xy_under_camera - bl
+camera_position = -bl     # the camera was at (0, 0) before re-centring
 
-# optimisation_result = least_squares(
-#     rectangle_residuals,
-#     initial_parameters,
-#     bounds=([-np.inf, -np.inf, 1e-6, 1e-6, -np.inf], [np.inf, np.inf, np.inf, np.inf, np.inf]))
+print("\n=== GROUND FRAME (mm) [origin = bottom-left corner, x right, y up page] ===")
+for n, g in zip(names, ground_points):
+    print(f"{n:13s} {g}")
+print(f"Camera position in ground frame (x, y): {camera_position}")
+print(f"Camera height above ground (z): {camera_height}")
 
-# (fitted_centre_x,fitted_centre_y,fitted_width,fitted_height,fitted_angle) = optimisation_result.x # Extract the optimised rectangle parameters.
-# fitted_corners = calculate_rectangle_corners(optimisation_result.x)  # Calculate the four ideal fitted rectangle corners.
-# fitted_angle_degrees = np.degrees(fitted_angle)  # Convert the orientation from radians to degrees.
-# corner_errors = ground_points - fitted_corners  # Calculate the residual error between observed and fitted corners.
-# total_squared_error = np.sum(corner_errors ** 2)  # Calculate the total squared corner error.
-# root_mean_squared_error = np.sqrt(total_squared_error / 4)  # Calculate the corner root mean squared error.
-
-
-
+# ============================================================
+# 9. BOARD SIZE (from the ground-frame points)
+# ============================================================
+TL, TR, BR, BL = ground_points
+width_top, width_bottom = np.linalg.norm(TR - TL), np.linalg.norm(BR - BL)
+height_left, height_right = np.linalg.norm(TL - BL), np.linalg.norm(TR - BR)
+print(f"\nBoard width:  {(width_top + width_bottom) / 2:.2f} mm (top {width_top:.2f}, bottom {width_bottom:.2f})")
+print(f"Board height: {(height_left + height_right) / 2:.2f} mm (left {height_left:.2f}, right {height_right:.2f})")
