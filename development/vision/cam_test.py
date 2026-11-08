@@ -14,7 +14,12 @@ REMOTE_HOST = "192.168.1.117"
 REMOTE_PATH = "/home/hjohns/Downloads/camera_test_{}.jpg".format(np.random.randint(0, 1000))
 
 
-def run_remote_command(command: list[str], description: str) -> None:
+def run_remote_command(
+    command: list[str],
+    description: str,
+    *,
+    required: bool = True,
+) -> bool:
     """Run a remote command and print enough output to diagnose failures."""
     print(f"[debug] {description}: {' '.join(command)}", flush=True)
     result = subprocess.run(command, capture_output=True, text=True)
@@ -25,37 +30,23 @@ def run_remote_command(command: list[str], description: str) -> None:
         print(f"[debug] stderr:\n{result.stderr.rstrip()}", flush=True)
     print(f"[debug] exit code: {result.returncode}", flush=True)
 
-    if result.returncode != 0:
+    if result.returncode != 0 and required:
         raise RuntimeError(
             f"{description} failed with exit code {result.returncode}"
         )
+    return result.returncode == 0
 
 
 # --------------------------------------------------------------------------
 # Image capture
 # --------------------------------------------------------------------------
 
-def capture_image(width: int = 2592, height: int = 1944) -> np.ndarray:
-    """Capture an image using the Raspberry Pi camera."""
-    result = subprocess.run(
-        [
-            "rpicam-jpeg",
-            "-o", "-",
-            "--width", str(width),
-            "--height", str(height),
-            "--nopreview",
-        ],
-        capture_output=True,
-        check=True
-    )
-
-    image = cv2.imdecode(
-        np.frombuffer(result.stdout, dtype=np.uint8),
-        cv2.IMREAD_COLOR
-    )
-    if image is None:
-        raise RuntimeError("Failed to decode captured image")
-    return image
+def capture_image() -> np.ndarray:
+    capture_args = ['libcamera-jpeg', '-o', '-', '--width', '3280', '--height', '2464', '--nopreview']
+    result = subprocess.run(capture_args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    image = cv2.imdecode(np.frombuffer(result.stdout, dtype=np.uint8), cv2.IMREAD_COLOR)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # immediately convert to grayscale to speed up processing
+    return gray
 
 def main() -> None:
     """Capture an image, save it locally, and display it."""
@@ -67,7 +58,7 @@ def main() -> None:
     print(f"[debug] Captured image saved to {OUTPUT_PATH}", flush=True)
 
     remote = f"{REMOTE_USER}@{REMOTE_HOST}"
-    run_remote_command(
+    opened = run_remote_command(
         [
             "ssh",
             "-o",
@@ -116,8 +107,16 @@ def main() -> None:
             REMOTE_PATH,
         ],
         "Remote image open",
+        required=False,
     )
-    print("[debug] Image opened on the computer", flush=True)
+    if opened:
+        print("[debug] Image opened on the computer", flush=True)
+    else:
+        print(
+            "[debug] Image transferred successfully, but the remote host "
+            "could not open it automatically",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
