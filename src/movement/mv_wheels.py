@@ -110,22 +110,26 @@ if __name__ == "__main__":
     DEMO_ANGLE = 30
     DEMO_WAIT = 0.5
 
-    print("Driving forward")
-    move_straight(DEMO_DISTANCE_MM)
+    # print("Driving forward")
+    # move_straight(DEMO_DISTANCE_MM)
+    # sleep(DEMO_WAIT)
+
+    # print("Driving backward")
+    # move_straight(-DEMO_DISTANCE_MM)
+    # sleep(DEMO_WAIT)
+
+    # print("Pivoting on the left wheel")
+    # pivot("left_wheel", DEMO_ANGLE)
+    # sleep(DEMO_WAIT)
+
+    # print("Pivoting on the right wheel")
+    # pivot("right_wheel", DEMO_ANGLE)
+    # sleep(DEMO_WAIT)
+
+    print("CCW Pivot")
+    pivot("centre", DEMO_ANGLE)
     sleep(DEMO_WAIT)
 
-    print("Driving backward")
-    move_straight(-DEMO_DISTANCE_MM)
-    sleep(DEMO_WAIT)
-
-    print("Pivoting on the left wheel")
-    pivot("left_wheel", DEMO_ANGLE)
-    sleep(DEMO_WAIT)
-
-    print("Pivoting on the right wheel")
-    pivot("right_wheel", DEMO_ANGLE)
-    sleep(DEMO_WAIT)
-
-    print("Pivoting around the centre")
+    print("CW Pivot")
     pivot("centre", DEMO_ANGLE)
     sleep(DEMO_WAIT)
